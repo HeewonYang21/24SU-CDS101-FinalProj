@@ -4,5 +4,6 @@
 
 ### Research Question: Do crime rates in Chicago show significant seasonal variation?
 Null Hypothesis (H0): There is no significant seasonal variation in crime rates in Chicago.
+
 Alternative Hypothesis (H1):  There is significant seasonal variation in crime rates in Chicago.
 
