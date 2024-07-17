@@ -1,0 +1,43 @@
+#Set up
+```{r setup, include = FALSE}
+# DO NOT ALTER THIS CHUNK
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  fig.width = 5,
+  fig.asp = 0.618,
+  out.width = "70%",
+  dpi = 120,
+  fig.align = "center",
+  cache = FALSE
+)
+
+# Load required packages
+install.packages("dplyr")
+library(dplyr)
+
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(infer))
+```
+
+##Use data from 2015-2021
+
+```{r}
+str(emissions$year)
+str(save_the_bees$year)
+str(us_tornado_dataset_1950_2021$yr)
+```
+```{r}
+carbon_em_ok <-filter(emissions, year >= 2015 & year <= 2021)
+save_bee_ok <- filter(save_the_bees, year >= 2015 & year <= 2021)
+us_tornado_ok <- filter(us_tornado_dataset_1950_2021, yr >= 2015 & yr <= 2021)
+
+```
+
+##Hypothesis testing Idea
+
+bees using data max number.
+single interaction multiple lm(y ~ x1 + x2 + x1*x2)
+
+  
+
