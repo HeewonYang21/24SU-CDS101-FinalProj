@@ -27,14 +27,59 @@ str(emissions$year)
 str(save_the_bees$year)
 str(us_tornado_dataset_1950_2021$yr)
 ```
+# filter 2015-2021
 ```{r}
-carbon_em_ok <-filter(emissions, year >= 2015 & year <= 2021)
-save_bee_ok <- filter(save_the_bees, year >= 2015 & year <= 2021)
-us_tornado_ok <- filter(us_tornado_dataset_1950_2021, yr >= 2015 & yr <= 2021)
+emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
+bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
+tornado_21 <- filter(us_tornado_dataset_1950_2021, yr >= 2015 & yr <= 2021)
 
 ```
 
+# select useful data
+```{r}
+bee_21 <- bee_21 %>%
+  select( state, quarter, year, max_colonies
+  )
+```
+
+# pivot wider into q1~q4
+```{r}
+bee_21 <- bee_21 %>%
+  pivot_wider(
+    names_from = quarter,
+    values_from = max_colonies
+  )
+```
+
+```{r}
+bee_21 <- bee_21 %>%
+  rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
+```
+# mutate average max colonies
+```{r}
+bee_21 <- bee_21 %>%
+  mutate(
+    avg_max_col = (q1 + q2 + q3 + q4) / 4
+  )
+```
+
+# select state
+https://www.statista.com/statistics/191996/top-10-honey-producing-us-states/
+
+Top 10 honey producing U.S. states in 2022
+: North Dakota, California, Texas, Montana, Florida, South Dakota, Minnesota, Oregon, Michigan, Georgia
+
+```{r}
+bee_21 <- bee_21 %>%
+  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
+
+```
+
+
 ##Hypothesis testing Idea
+
+
+## Modeling (lm)
 
 bees using data max number.
 single interaction multiple lm(y ~ x1 + x2 + x1*x2)
