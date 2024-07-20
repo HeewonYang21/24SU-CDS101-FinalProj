@@ -9,7 +9,7 @@
 
 # Work
 1. Intro/data - 박소연---------------------{ ppt 파일
-2. EDA/Visualization - 최준서----}
-3. Hypothesis - 송호재 ---------- Rmd 파일 
-4. Modeling - 양희원-------------}
+2. EDA/Visualization - 최준서----<
+3. Hypothesis - 송호재 ----------< Rmd 파일 
+4. Modeling - 양희원-------------<
 5. Conclusion/ implication - 이소정--------{ ppt 파일
