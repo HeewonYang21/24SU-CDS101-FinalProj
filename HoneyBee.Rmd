@@ -20,14 +20,16 @@ suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(infer))
 ```
 
-##Use data from 2015-2021
+#Intro & DataSet
+
+## Use data from 2015-2021
 
 ```{r}
 str(emissions$year)
 str(save_the_bees$year)
 str(us_tornado_dataset_1950_2021$yr)
 ```
-# filter 2015-2021
+### filter 2015-2021
 ```{r}
 emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
 bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
@@ -35,14 +37,14 @@ tornado_21 <- filter(us_tornado_dataset_1950_2021, yr >= 2015 & yr <= 2021)
 
 ```
 
-# select useful data
+### select useful data
 ```{r}
 bee_21 <- bee_21 %>%
   select( state, quarter, year, max_colonies
   )
 ```
 
-# pivot wider into q1~q4
+### pivot wider into q1~q4
 ```{r}
 bee_21 <- bee_21 %>%
   pivot_wider(
@@ -55,7 +57,8 @@ bee_21 <- bee_21 %>%
 bee_21 <- bee_21 %>%
   rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
 ```
-# mutate average max colonies
+
+### mutate average max colonies
 ```{r}
 bee_21 <- bee_21 %>%
   mutate(
@@ -63,17 +66,47 @@ bee_21 <- bee_21 %>%
   )
 ```
 
-# select state
+### select state
 https://www.statista.com/statistics/191996/top-10-honey-producing-us-states/
 
 Top 10 honey producing U.S. states in 2022
 : North Dakota, California, Texas, Montana, Florida, South Dakota, Minnesota, Oregon, Michigan, Georgia
 
 ```{r}
-bee_21 <- bee_21 %>%
+bee_top_10 <- bee_21 %>%
   filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
 
 ```
+
+bee_top_10 <- bee_top_10 %>%
+  pivot_wider(
+    names_from = state,
+    values_from = avg_max_col
+  )
+
+## CO2 emission
+
+### sum of each fuel.name value
+```{r}
+emission_21 <- emission_21 %>%
+  group_by(year,state.name, fuel.name) %>%
+  summarise(sum_value = sum(value, na.rm = TRUE))
+```
+### pivot wide each fuel name
+```{r}
+emission_21 <- emission_21 %>%
+  pivot_wider(
+    names_from = fuel.name,
+    values_from = sum_value
+  )
+```
+
+### filter Top 10 honey producers
+```{r}
+emission_10 <- emission_21 %>%
+  filter(state.name %in% c("North Dakota", "California", "Texas","Montana", "Florida", "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
+```
+
 
 
 ##Hypothesis testing Idea
