@@ -141,6 +141,45 @@ bee_df <- merge(bee_df, tornado_10, c("year", "state"))
 
 ## EDA / Visualization
 
+```{r}
+#Dividing avg_max_col by 1000
+bee_df <- bee_df %>%
+  mutate(avg_max_col_1000 = avg_max_col/1000)
+```
+
+```{r}
+#Histogram of average bees
+bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = avg_max_col_1000,fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Average Maximum Colonies",
+       x = "Average Maximum Colonies (1 = 1000)",
+       y = "Frequency")
+```
+
+```{r}
+#Histogram of Carbon Emission
+bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = all_fules,fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Carbon Emissions",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+
+```{r}
+#Histogram of Tornado
+bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = count, fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Tornado",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+
 
 ##Hypothesis testing Idea
 
