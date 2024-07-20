@@ -22,13 +22,6 @@ us_tornado_1950_2021 <-
   read.csv("us_tornado_dataset_1950_2021.csv")
 ```
 
-
-## Use data from 2015-2021
-```{r}
-str(emissions$year)
-str(save_the_bees$year)
-str(us_tornado_1950_2021$yr)
-```
 ### filter 2015-2021
 ```{r}
 emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
@@ -41,7 +34,7 @@ tornado_21 <- filter(us_tornado_1950_2021, yr >= 2015 & yr <= 2021)
 ### select useful data
 ```{r}
 bee_21 <- bee_21 %>%
-  select( state, quarter, year, max_colonies
+  select( state, state_code, quarter, year, max_colonies
   )
 ```
 
@@ -63,8 +56,9 @@ bee_21 <- bee_21 %>%
 ```{r}
 bee_21 <- bee_21 %>%
   mutate(
-    avg_max_col = (q1 + q2 + q3 + q4) / 4
-  )
+    avg_max_col = if_else(
+      year != "2019",
+      (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
 ```
 
 ### select state
@@ -77,21 +71,23 @@ Top 10 honey producing U.S. states in 2022
 bee_top_10 <- bee_21 %>%
   filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", 
                       "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
-
 ```
 
+```{r}
 bee_top_10 <- bee_top_10 %>%
-  pivot_wider(
-    names_from = state,
-    values_from = avg_max_col
-  )
+  select(year, state, avg_max_col)
+```
+
 
 ## CO2 emission
 ### sum of each fuel.name value
 ```{r}
 emission_21 <- emission_21 %>%
   group_by(year,state.name, fuel.name) %>%
-  summarise(sum_value = sum(value, na.rm = TRUE))
+  summarise(sum_value = sum(value, na.rm = TRUE),.groups = 'drop')
+
+emission_21 <- emission_21 %>%
+  rename(state = state.name)
 ```
 ### pivot wide each fuel name
 ```{r}
@@ -105,8 +101,14 @@ emission_21 <- emission_21 %>%
 ### filter Top 10 honey producers
 ```{r}
 emission_10 <- emission_21 %>%
-  filter(state.name %in% c("North Dakota", "California", "Texas","Montana", "Florida",
+  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida",
                            "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
+```
+
+```{r}
+emission_10 <- emission_10 %>%
+  rename(all_fules = `All Fuels`) %>%
+  select(year, state, all_fules)
 ```
 
 ## Tornado
@@ -115,15 +117,26 @@ emission_10 <- emission_21 %>%
 tornado_21 <- tornado_21 %>%
   group_by(yr, st) %>%
   summarise(
-    count= n()
-  )
+    count= n(), .groups = 'drop'
+  ) %>%
+  rename(year = yr, state = st)
 ```
+
 ```{r}
-tornado_count_21 <- tornado_21 %>%
-  pivot_wider(
-    names_from = yr,
-    values_from = count
-  )
+tornado_10 <- tornado_21 %>%
+  filter(state %in% c("ND", "CA", "TX", "MT", "FL", "SD", "MN", "OR", "MI", "GA")) %>%
+  mutate(state = recode(state, 
+                     "ND" = "North Dakota", "CA" = "California",
+                     "TX" = "Texas", "MT" = "Montana",
+                     "FL" = "Florida","SD" = "South Dakota",
+                     "MN" = "Minnesota","OR" = "Oregon",
+                     "MI" = "Michigan","GA" = "Georgia"))
+```
+
+## merge
+```{r}
+bee_df <- merge(bee_top_10, emission_10, c("year", "state"))
+bee_df <- merge(bee_df, tornado_10, c("year", "state"))  
 ```
 
 ## EDA / Visualization
@@ -133,6 +146,9 @@ tornado_count_21 <- tornado_21 %>%
 
 
 ##Modeling (lm)
+
+
+
 
 bees using data max number.
 single interaction multiple lm(y ~ x1 + x2 + x1*x2)
