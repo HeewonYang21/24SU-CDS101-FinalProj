@@ -1,7 +1,7 @@
 ---
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 #Set up
 ```{r setup, include = FALSE}
@@ -17,6 +17,9 @@ suppressPackageStartupMessages(library(infer))
 
 ```{r}
 emissions <- read.csv("emissions.csv")
+save_the_bees <- read.csv("save_the_bees.csv")
+us_tornado_1950_2021 <-
+  read.csv("us_tornado_dataset_1950_2021.csv")
 ```
 
 
@@ -24,16 +27,17 @@ emissions <- read.csv("emissions.csv")
 ```{r}
 str(emissions$year)
 str(save_the_bees$year)
-str(us_tornado_dataset_1950_2021$yr)
+str(us_tornado_1950_2021$yr)
 ```
 ### filter 2015-2021
 ```{r}
 emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
 bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
-tornado_21 <- filter(us_tornado_dataset_1950_2021, yr >= 2015 & yr <= 2021)
+tornado_21 <- filter(us_tornado_1950_2021, yr >= 2015 & yr <= 2021)
 
 ```
 
+## Honey Bee
 ### select useful data
 ```{r}
 bee_21 <- bee_21 %>%
@@ -71,7 +75,8 @@ Top 10 honey producing U.S. states in 2022
 
 ```{r}
 bee_top_10 <- bee_21 %>%
-  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
+  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", 
+                      "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
 
 ```
 
@@ -82,7 +87,6 @@ bee_top_10 <- bee_top_10 %>%
   )
 
 ## CO2 emission
-
 ### sum of each fuel.name value
 ```{r}
 emission_21 <- emission_21 %>%
@@ -101,9 +105,28 @@ emission_21 <- emission_21 %>%
 ### filter Top 10 honey producers
 ```{r}
 emission_10 <- emission_21 %>%
-  filter(state.name %in% c("North Dakota", "California", "Texas","Montana", "Florida", "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
+  filter(state.name %in% c("North Dakota", "California", "Texas","Montana", "Florida",
+                           "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
 ```
 
+## Tornado
+### Frequency
+```{r}
+tornado_21 <- tornado_21 %>%
+  group_by(yr, st) %>%
+  summarise(
+    count= n()
+  )
+```
+```{r}
+tornado_count_21 <- tornado_21 %>%
+  pivot_wider(
+    names_from = yr,
+    values_from = count
+  )
+```
+
+## EDA / Visualization
 
 
 ##Hypothesis testing Idea
