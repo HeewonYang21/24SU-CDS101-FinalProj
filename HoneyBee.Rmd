@@ -1,29 +1,26 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 #Set up
 ```{r setup, include = FALSE}
-# DO NOT ALTER THIS CHUNK
-knitr::opts_chunk$set(
-  echo = TRUE,
-  eval = TRUE,
-  fig.width = 5,
-  fig.asp = 0.618,
-  out.width = "70%",
-  dpi = 120,
-  fig.align = "center",
-  cache = FALSE
-)
 
 # Load required packages
-install.packages("dplyr")
 library(dplyr)
 
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(infer))
 ```
 
-#Intro & DataSet
+#[Intro & DataSet]
+
+```{r}
+emissions <- read.csv("emissions.csv")
+```
+
 
 ## Use data from 2015-2021
-
 ```{r}
 str(emissions$year)
 str(save_the_bees$year)
@@ -112,7 +109,7 @@ emission_10 <- emission_21 %>%
 ##Hypothesis testing Idea
 
 
-## Modeling (lm)
+##Modeling (lm)
 
 bees using data max number.
 single interaction multiple lm(y ~ x1 + x2 + x1*x2)
