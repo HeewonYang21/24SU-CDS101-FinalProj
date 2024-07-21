@@ -213,6 +213,42 @@ bee_df %>%
        y = "Frequency")
 ```
 
+```{r}
+#Violin plot for Colonies and Year
+bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = year,y = avg_max_col_1000)) +
+  labs(
+    title = "Distribution of Average Maximum Colonies by Year",
+    x = "Year",
+    y = "Maximum Colonies (1 = 1000)"
+    )
+```
+
+```{r}
+#Violin plot for Emission by year
+bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = year,y = all_fules)) +
+  labs(
+    title = "Distribution of Carbon Emissions by Year",
+    x = "Year",
+    y = "Amount of Emissions"
+    )
+```
+
+```{r}
+#Violin plot for Tornado count
+bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = year,y = count)) +
+  labs(
+    title = "Distribution of Tornado Count by Year",
+    x = "Year",
+    y = "Tornado count"
+    )
+```
+
 ##Hypothesis testing Idea
 
 
