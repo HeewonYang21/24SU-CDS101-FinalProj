@@ -1,0 +1,576 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Set up
+```{r setup, include = FALSE}
+
+# Load required packages
+library(dplyr)
+library(broom)
+library(modelr)
+
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(infer))
+```
+
+# 1. Intro & DataSet
+```{r}
+# Read three csv files
+emissions <- read.csv("emissions.csv")
+save_the_bees <- read.csv("save_the_bees.csv")
+us_tornado_1950_2021 <-
+  read.csv("us_tornado_dataset_1950_2021.csv")
+```
+
+```{r}
+# Filter year 2015-2021 to use same period
+emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
+bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
+tornado_21 <- filter(us_tornado_1950_2021, yr >= 2015 & yr <= 2021)
+
+```
+
+### Honey Bee data
+```{r}
+# Select useful data to calculate average max_colonies with quarter
+bee_avg_max <- bee_21 %>%
+  select( state, state_code, quarter, year, max_colonies)
+```
+
+```{r}
+# Pivot wider into q1~q4 
+bee_avg_max <- bee_avg_max %>%
+  pivot_wider(
+    names_from = quarter,
+    values_from = max_colonies
+  )
+
+bee_avg_max <- bee_avg_max %>%
+  rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
+```
+
+```{r}
+# Mutate average max colonies
+bee_avg_max <- bee_avg_max %>%
+  mutate(
+    avg_max_col = if_else(
+      year != "2019",
+      (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
+```
+
+### CO2 emission
+```{r}
+# Sum of each fuel.name values
+emission_fuel <- emission_21 %>%
+  group_by(year,state.name, fuel.name) %>%
+  summarise(sum_value = sum(value, na.rm = TRUE),.groups = 'drop')
+
+```
+
+```{r}
+# Pivot wide each fuel name
+emission_fuel <- emission_fuel %>%
+  pivot_wider(
+    names_from = fuel.name,
+    values_from = sum_value
+  )%>%
+  rename(state = state.name, all_fuel = 'All Fuels')
+```
+
+### Tornado
+```{r}
+# Count tornado frequency by year and state
+tornado_freq <- tornado_21 %>%
+  rename(year = yr, state = st) %>%
+  group_by(year, state) %>%
+  summarise(count = n(), .groups = 'drop') 
+```
+
+```{r}
+# Fill 0 at no tornado state&year 
+# Make same column number with emission_21
+tornado_freq <- tornado_freq %>%
+  complete(year = unique(tornado_freq$year),
+           state = unique(tornado_freq$state),
+           fill = list(count = 0)) ### fill 0
+```
+
+### Merge Data for Modeling
+
+## 4. Modeling 1: Make first dataframe and model
+
+i. Step 1: bee vs emission
+```{r}
+# Data cleaning
+bee_state <- bee_avg_max %>%
+  filter(!(state %in% c("Other", "United States")))
+emission_state <- emission_fuel %>%
+  filter(!(state %in% c("Alaska","Delaware","District of Columbia",
+                        "Nevada","New Hampshire","Rhode Island",
+                        "United States")))
+```
+
+```{r}
+# Data merge
+bee_emission_df <- merge(bee_state, emission_state, by = c("state", "year")) %>%
+  mutate(
+    avg_max_col = round(avg_max_col, 0),
+    all_fuel = round(all_fuel, 0)
+    )
+```
+
+
+ii. Step 2: bee vs tornado
+```{r}
+# Data cleaning
+tornado_state <- tornado_freq %>%
+  filter(!(state %in% c("DC", "DE","NH","NV","PR","RI","VI"))
+         ) %>%
+  rename(state_code = state)
+```
+
+```{r}
+# Data merge
+bee_tornado_df <- merge(bee_state, tornado_state, by = c("state_code", "year"))
+```
+
+
+iii. Step 3: bee vs emission + tornado
+```{r}
+# Data cleaning
+bee_tornado_df <- bee_tornado_df %>%
+  select(year, state, count)
+bee_emission_df <- bee_emission_df %>%
+  select(year, state, avg_max_col, all_fuel)
+```
+
+```{r}
+# Data merge
+bee_df <- merge(bee_emission_df, bee_tornado_df, by = c("state", "year"))
+```
+
+------------------------------------------------------------------------
+
+## 2. EDA / Summary Statistics
+
+i. Data frame
+```{r}
+bee_df %>%
+  ggplot() +
+  geom_point(mapping = aes(x = year, y = avg_max_col)) +
+  facet_wrap(~state, scales = "free_y")+
+  geom_smooth(aes(year, avg_max_col),method = "lm")
+```
+
+```{r}
+new_bee_df <- bee_df %>%
+  filter(state %in% c("Arizona", "Arkansas", "Colorado", "Louisiana", 
+                      "Maine", "Maryland", "Minnesota", "Mississippi",
+                      "Missouri", "Montana", "Nebraska", "New Mexico",
+                      "Ohio", "South Dakota", "Washington", "Wisconsin"))
+```
+
+ii. Summary statistics
+```{r}
+#Dividing avg_max_col by 1000
+new_bee_df <- new_bee_df %>%
+  mutate(avg_max_col_1000 = avg_max_col/1000)
+```
+
+```{r}
+# Detailed summary statistics for the entire dataset
+avg_max_col_summary <- new_bee_df %>%
+  summarise(
+    avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_sd = sd(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_min = min(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE))
+
+all_fuel_summary <- new_bee_df %>%
+  summarise(
+    all_fuels_mean = mean(all_fuel, na.rm = TRUE),
+    all_fuels_sd = sd(all_fuel, na.rm = TRUE),
+    all_fuels_min = min(all_fuel, na.rm = TRUE),
+    all_fuels_max = max(all_fuel, na.rm = TRUE))
+
+tornado_summary <- new_bee_df %>%
+  summarise(
+    tornado_count_mean = mean(count, na.rm = TRUE),
+    tornado_count_sd = sd(count, na.rm = TRUE),
+    tornado_count_min = min(count, na.rm = TRUE),
+    tornado_count_max = max(count, na.rm = TRUE))
+```
+
+```{r}
+print(avg_max_col_summary)
+```
+
+```{r}
+print(all_fuel_summary)
+```
+
+```{r}
+print(tornado_summary)
+```
+
+----------------------------------------------------------------------------
+
+iii. Visualization
+```{r}
+# Visualization of mean average maximum colonies by state and year
+new_bee_df %>%
+  group_by(year, state) %>%
+  summarise(
+    avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  ggplot() +
+  geom_bar(mapping = aes(x = state, y = avg_max_col_mean, fill = year), 
+           stat = "identity", position = "dodge") +
+  labs(
+    title = "Average Maximum Colonies by State and Year",
+    x = "State",
+    y = "Average Maximum Colonies (1 = 1000)"
+  ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+#Histogram of average bees
+new_bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = avg_max_col_1000,fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Average Maximum Colonies",
+       x = "Average Maximum Colonies (1 = 1000)",
+       y = "Frequency")
+```
+```{r}
+#Histogram of Carbon Emission
+new_bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = all_fuel,fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Carbon Emissions",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+```{r}
+#Histogram of Tornado
+new_bee_df %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = count, fill = state), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Tornado",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+```{r,}
+#Boxplot of average colonies
+new_bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = avg_max_col_1000), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Average Maximum Colonies",
+       x = "Average Maximum Colonies (1 = 1000)",
+       y = "Frequency")
+```
+```{r,}
+#Boxplot of Emission
+new_bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = all_fuel), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Carbon Emission",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+```{r,}
+#Boxplot of Tornado
+new_bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = count), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Tornado",
+       x = "Count of tornado",
+       y = "Frequency")
+```
+```{r}
+#Scatter plot for Colonies and Emission
+new_bee_df %>%
+  ggplot() +
+  geom_point(mapping = aes(x = all_fuel,y = avg_max_col_1000)) +
+  geom_smooth(aes(all_fuel,avg_max_col_1000),method = "lm")+
+  facet_wrap(~year, scales = "free")+
+  labs(
+    title = "Distribution of Average Maximum Colonies and Emission by Year",
+    x = "All fuels",
+    y = "Maximum Colonies (1 = 1000)"
+    )
+```
+```{r}
+#Violin plot for Emission by year
+new_bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = factor(year), y = all_fuel)) +
+  labs(
+    title = "Distribution of Carbon Emissions by Year",
+    x = "Year",
+    y = "Amount of Emissions"
+    )
+```
+```{r}
+#Violin plot for Tornado count
+new_bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = factor(year),y = count)) +
+  labs(
+    title = "Distribution of Tornado Count by Year",
+    x = "Year",
+    y = "Tornado count"
+    )
+```
+
+
+-----------------------------------------------------------------------
+
+
+## 3. Hypothesis testing Idea
+
+-----------------------------------------------------------------------
+
+
+iv. Modeling: Multiple linear regression
+
+## 4. Modeling 1: Make first dataframe(1.Data) and model
+```{r}
+# Modeling
+bee_model_0 <- lm(avg_max_col ~ all_fuel + count + all_fuel*count, data = bee_df)
+```
+
+* Step 1: Examining the model coefficients & model fit
+```{r}
+# tidy() -> y-intercept , lm-slope
+# glance() -> R2 value
+bee_model_0 %>%
+  tidy()
+
+bee_model_0 %>%
+  glance() %>%
+  select(1:3)
+```
+* Step 2: Residuals
+```{r}
+# add predictions and residuals
+bee_df <- bee_df %>%
+add_predictions(bee_model_0) %>%
+add_residuals(bee_model_0)
+```
+
+* Step 3: 3 assumptions
+```{r}
+# Linearity: Observed vs Predicted Plot
+bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = avg_max_col))+
+geom_abline(slope = 1, intercept = 0, color = "blue")+
+labs(title = "Observed Predictions of factors",
+x= "Predictions", y = "Observed Price")
+```
+
+```{r}
+# Nearly normal residuals: QQ plot
+bee_df %>%
+ggplot()+
+geom_qq(aes(sample = resid))+
+geom_qq_line(aes(sample = resid),color = "red")+
+labs(title = "Q-Q Plot showing Residuals of Each Data",
+x = "Theoretical Quantiles", y = "Sample Quantiles")
+```
+
+```{r}
+# Constant variability: a residuals vs predicted plot
+bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = resid))+
+geom_hline(yintercept = 0)+
+labs(title = "Residual Versus Predicted of factors",
+x = "Predicted", y = "Residual")
+```
+
+## Modeling 2: Making New Dataframe using decreasing lm state
+
+```{r}
+# Examine data
+bee_df %>%
+  ggplot() +
+  geom_point(mapping = aes(x = year, y = avg_max_col)) +
+  facet_wrap(~state, scales = "free_y")+
+  geom_smooth(aes(year, avg_max_col),method = "lm")
+```
+
+```{r}
+# Filter states showing negative linear relationship
+new_bee_df <- bee_df %>%
+  filter(state %in% c("Arizona", "Arkansas", "Colorado", "Louisiana", 
+                      "Maine", "Maryland", "Minnesota", "Mississippi",
+                      "Missouri", "Montana", "Nebraska", "New Mexico",
+                      "Ohio", "South Dakota", "Washington", "Wisconsin"))
+```
+
+```{r}
+# Make new dataframe
+new_bee_df <- new_bee_df %>%
+add_predictions(bee_model_0) %>%
+add_residuals(bee_model_0)
+```
+
+```{r}
+# Linearity: with new df
+new_bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = avg_max_col))+
+geom_abline(slope = 1, intercept = 0, color = "blue")+
+labs(title = "Observed Predictions of factors",
+x= "Predictions", y = "Observed Price")
+```
+
+```{r}
+# Nearly normal residuals: with new df
+new_bee_df %>%
+ggplot()+
+geom_qq(aes(sample = resid))+
+geom_qq_line(aes(sample = resid),color = "red")+
+labs(title = "Q-Q Plot showing Residuals of Each Data",
+x = "Theoretical Quantiles", y = "Sample Quantiles")
+```
+
+```{r}
+# Constant variability: with new df
+new_bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = resid))+
+geom_hline(yintercept = 0)+
+labs(title = "Residual Versus Predicted of factors",
+x = "Predicted", y = "Residual")
+```
+
+
+
+## Modeling 3: new_avg_max_col = avg_max_col / 1000
+
+```{r}
+new_bee_df_02<- new_bee_df %>%
+  mutate(new_avg_max_col = avg_max_col / 1000)
+```
+
+...
+
+
+## Modeling 4: Make stronger model by adding Internal Factors 'varroa_mites'
+
+i. Make new dataset
+```{r}
+bee_inf <- filter(save_the_bees, year >= 2015 & year <= 2021)
+
+bee_inf <- bee_inf %>%
+  select( state, state_code, quarter, year, varroa_mites)
+```
+
+```{r}
+bee_inf <- bee_inf %>%
+  pivot_wider(
+    names_from = quarter,
+    values_from = varroa_mites
+  )
+```
+
+```{r}
+bee_inf <- bee_inf %>%
+  rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
+```
+
+
+```{r}
+# Mtate average varroa_mites
+bee_inf <- bee_inf %>%
+  mutate(
+    avg_var_col = if_else(
+      year != "2019",
+      (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
+```
+
+```{r}
+bee_inf <- bee_inf %>%
+  filter(!(state %in% c("Other", "United States")))
+```
+
+ii. Make new dataframe
+```{r}
+bee_df_2 <- merge(bee_df, bee_inf, by = c("state", "year"))
+```
+
+iii. Make new model (ver.2)
+```{r}
+new_bee_model <- lm(avg_max_col ~ all_fuel + count + avg_var_col + all_fuel*count,  data = bee_df_2)
+```
+
+iv. Examining new model -1 
+```{r}
+# tidy(), glance()
+new_bee_model %>%
+  tidy()
+
+new_bee_model %>%
+  glance() %>%
+  select(1:3)
+```
+
+v. Examining new model -2
+```{r}
+new2_bee_df <- bee_df_2 %>%
+add_predictions(new_bee_model) %>%
+add_residuals(new_bee_model)
+```
+
+Vi. Filter states again
+```{r}
+new2_bee_df <- new2_bee_df %>%
+  filter(state %in% c("Arizona", "Arkansas", "Colorado", "Louisiana", 
+                      "Maine", "Maryland", "Minnesota", "Mississippi",
+                      "Missouri", "Montana", "Nebraska", "New Mexico",
+                      "Ohio", "South Dakota", "Washington", "Wisconsin"))
+```
+
+
+```{r}
+# Linearity: with new df and new model
+new2_bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = avg_max_col))+
+geom_abline(slope = 1, intercept = 0, color = "blue")+
+labs(title = "Observed Predictions of factors",
+x= "Predictions", y = "Observed Price")
+```
+
+```{r}
+# Nearly normal residuals: with new df and new model
+new2_bee_df %>%
+ggplot()+
+geom_qq(aes(sample = resid))+
+geom_qq_line(aes(sample = resid),color = "red")+
+labs(title = "Q-Q Plot showing Residuals of Each Data",
+x = "Theoretical Quantiles", y = "Sample Quantiles")
+```
+
+```{r}
+# Constant variability: with new df and new model
+new2_bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = resid))+
+geom_hline(yintercept = 0)+
+labs(title = "Residual Versus Predicted of factors",
+x = "Predicted", y = "Residual")
+```
+
+
