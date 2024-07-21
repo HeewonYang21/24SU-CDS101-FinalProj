@@ -64,7 +64,24 @@ bee_21 <- bee_21 %>%
       (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
 ```
 
+### select state
+https://www.statista.com/statistics/191996/top-10-honey-producing-us-states/
 
+Top 10 honey producing U.S. states in 2022
+: North Dakota, California, Texas, Montana, Florida, South Dakota, Minnesota, Oregon, Michigan, Georgia
+
+```{r}
+bee_top_10 <- bee_21 %>%
+  filter(state %in% c(
+    "North Dakota", "California", "Texas","Montana", "Florida", 
+                      "South Dakota", "Minnesota", "Oregon", "Michigan",
+    "Georgia" ))
+```
+
+```{r}
+bee_top_10 <- bee_top_10 %>%
+  select(year, state, avg_max_col)
+```
 
 
 ## [CO2 emission]
@@ -86,7 +103,20 @@ emission_21 <- emission_21 %>%
   rename(state = state.name, all_fuel = 'All Fuels')
 ```
 
+### filter Top 10 honey producers
+```{r}
+emission_10 <- emission_21 %>%
+  filter(state %in% c("North Dakota", "California", "Texas","Montana", 
+                      "Florida",
+                           "South Dakota", "Minnesota", "Oregon", "Michigan", 
+                      "Georgia" ))
+```
 
+```{r}
+emission_10 <- emission_10 %>%
+  rename(all_fules = `All Fuels`) %>%
+  select(year, state, all_fules)
+```
 
 
 
