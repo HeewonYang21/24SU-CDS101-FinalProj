@@ -179,7 +179,39 @@ bee_df %>%
        x = "Carbon Emission",
        y = "Frequency")
 ```
+```{r,}
+#Boxplot of average colonies
+bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = avg_max_col_1000), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Average Maximum Colonies",
+       x = "Average Maximum Colonies (1 = 1000)",
+       y = "Frequency")
+```
 
+```{r,}
+#Boxplot of Emission
+bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = all_fules), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Tornado",
+       x = "Carbon Emission",
+       y = "Frequency")
+```
+
+
+```{r,}
+#Boxplot of Tornado
+bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = count), bins = 20) +
+  facet_wrap(~year) +
+  labs(title = "Distribution of Tornado",
+       x = "Count of tornado",
+       y = "Frequency")
+```
 
 ##Hypothesis testing Idea
 
