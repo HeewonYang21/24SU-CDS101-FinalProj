@@ -139,13 +139,53 @@ bee_df <- merge(bee_top_10, emission_10, c("year", "state"))
 bee_df <- merge(bee_df, tornado_10, c("year", "state"))  
 ```
 
-## EDA / Visualization
+## EDA / Summary Statistics
 
 ```{r}
 #Dividing avg_max_col by 1000
 bee_df <- bee_df %>%
   mutate(avg_max_col_1000 = avg_max_col/1000)
 ```
+
+```{r}
+# Detailed summary statistics for the entire dataset
+avg_max_col_summary <- bee_df %>%
+  summarise(
+    avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_sd = sd(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_min = min(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE))
+
+all_fules_summary <- bee_df %>%
+  summarise(
+    all_fuels_mean = mean(all_fules, na.rm = TRUE),
+    all_fuels_sd = sd(all_fules, na.rm = TRUE),
+    all_fuels_min = min(all_fules, na.rm = TRUE),
+    all_fuels_max = max(all_fules, na.rm = TRUE))
+
+tornado_summary <- bee_df %>%
+  summarise(
+    tornado_count_mean = mean(count, na.rm = TRUE),
+    tornado_count_sd = sd(count, na.rm = TRUE),
+    tornado_count_min = min(count, na.rm = TRUE),
+    tornado_count_max = max(count, na.rm = TRUE))
+```
+
+```{r}
+print(avg_max_col_summary)
+```
+
+```{r}
+print(all_fules_summary)
+```
+
+```{r}
+print(tornado_summary)
+```
+
+
+
+## EDA / Visualization
 
 ```{r}
 #Histogram of average bees
