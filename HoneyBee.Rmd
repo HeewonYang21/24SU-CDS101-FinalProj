@@ -183,7 +183,23 @@ print(all_fules_summary)
 print(tornado_summary)
 ```
 
-
+```{r}
+# Visualization of mean average maximum colonies by state and year
+bee_df %>%
+  group_by(year, state) %>%
+  summarise(
+    avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  ggplot() +
+  geom_bar(mapping = aes(x = state, y = avg_max_col_mean, fill = year), 
+           stat = "identity", position = "dodge") +
+  labs(
+    title = "Average Maximum Colonies by State and Year",
+    x = "State",
+    y = "Average Maximum Colonies (1 = 1000)"
+  ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
 ## EDA / Visualization
 
