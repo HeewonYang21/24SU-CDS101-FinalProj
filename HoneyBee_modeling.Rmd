@@ -161,7 +161,7 @@ avg_max_col_summary <- bee_df %>%
     avg_max_col_sd = sd(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_min = min(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE),
-    avg_max_col_median = median(avg_max_col_1000, na.rm = TRUE)))
+    avg_max_col_median = median(avg_max_col_1000, na.rm = TRUE))
 
 all_fules_summary <- bee_df %>%
   summarise(
