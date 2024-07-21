@@ -1,5 +1,5 @@
 # 24su-CDS101-FinalProj
-
+!!! 최종 파일은 HoneyBee_Fin 파일로 작업해주시기 바랍니다!!!
 1. Honey Bee
 * (https://www.kaggle.com/datasets/m000sey/save-the-honey-bees)
 2. CO2 emission
