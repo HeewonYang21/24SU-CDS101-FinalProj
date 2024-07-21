@@ -1,0 +1,245 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+#Set up
+```{r setup, include = FALSE}
+
+# Load required packages
+library(dplyr)
+library(broom)
+library(modelr)
+
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(infer))
+```
+
+#[Intro & DataSet]
+
+```{r}
+emissions <- read.csv("emissions.csv")
+save_the_bees <- read.csv("save_the_bees.csv")
+us_tornado_1950_2021 <-
+  read.csv("us_tornado_dataset_1950_2021.csv")
+```
+
+### filter 2015-2021 
+```{r}
+emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
+bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
+tornado_21 <- filter(us_tornado_1950_2021, yr >= 2015 & yr <= 2021)
+
+```
+
+## [Honey Bee]
+
+### select useful data 
+```{r}
+bee_21 <- bee_21 %>%
+  select( state, state_code, quarter, year, max_colonies)
+```
+
+### pivot wider into q1~q4 
+```{r}
+bee_21 <- bee_21 %>%
+  pivot_wider(
+    names_from = quarter,
+    values_from = max_colonies
+  )
+```
+
+
+```{r}
+bee_21 <- bee_21 %>%
+  rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
+```
+
+### mutate average max colonies
+```{r}
+bee_21 <- bee_21 %>%
+  mutate(
+    avg_max_col = if_else(
+      year != "2019",
+      (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
+```
+
+
+
+
+## [CO2 emission]
+
+### sum of each fuel.name value
+```{r}
+emission_21 <- emission_21 %>%
+  group_by(year,state.name, fuel.name) %>%
+  summarise(sum_value = sum(value, na.rm = TRUE),.groups = 'drop')
+
+```
+### pivot wide each fuel name
+```{r}
+emission_21 <- emission_21 %>%
+  pivot_wider(
+    names_from = fuel.name,
+    values_from = sum_value
+  )%>%
+  rename(state = state.name, all_fuel = 'All Fuels')
+```
+
+
+
+
+
+## [Tornado]
+
+### Frequency
+
+```{r}
+tornado_21 <- tornado_21 %>%
+  group_by(yr, st) %>%
+  summarise(
+    count= n(), .groups = 'drop'
+  ) %>%
+  rename(year = yr, state = st)
+```
+
+```{r}
+tornado_10 <- tornado_21 %>%
+  filter(state %in% c("ND", "CA", "TX", "MT", "FL", "SD", "MN", "OR", "MI", "GA")) %>%
+  mutate(state = recode(state, 
+                     "ND" = "North Dakota", "CA" = "California",
+                     "TX" = "Texas", "MT" = "Montana",
+                     "FL" = "Florida","SD" = "South Dakota",
+                     "MN" = "Minnesota","OR" = "Oregon",
+                     "MI" = "Michigan","GA" = "Georgia"))
+```
+
+
+
+
+## [EDA / Visualization]
+
+
+
+
+
+## [Hypothesis testing Idea]
+
+
+## [Modeling ] (lm)
+
+1. bee vs emission
+
+### data cleaning
+```{r}
+bee_state <- bee_21 %>%
+  filter(!(state %in% c("Other", "United States")))
+emission_state <- emission_21 %>%
+  filter(!(state %in% c("Alaska","Delaware","District of Columbia",
+                        "Nevada","New Hampshire","Rhode Island",
+                        "United States")))
+```
+
+### data merge
+```{r}
+bee_emission_df <- merge(bee_state, emission_state, by = c("state", "year")) %>%
+  mutate(
+    avg_max_col = round(avg_max_col, 0),
+    all_fuel = round(all_fuel, 0)
+    )
+```
+
+
+2. bee vs tornado
+
+### data cleaning
+```{r}
+tornado_state <- tornado_21 %>%
+  filter(!(state %in% c("DC", "DE","NH","NV","PR","RI","VI"))
+         ) %>%
+  rename(state_code = state)
+```
+
+### data merge
+```{r}
+bee_tornado_df <- merge(bee_state, tornado_state, by = c("state_code", "year"))
+```
+
+
+3. bee vs emission + tornado
+
+### data cleaning
+```{r}
+bee_tornado_df <- bee_tornado_df %>%
+  select(year, state, count)
+bee_emission_df <- bee_emission_df %>%
+  select(year, state, avg_max_col, all_fuel)
+```
+
+### data merge
+```{r}
+bee_df <- merge(bee_emission_df, bee_tornado_df, by = c("state", "year"))
+```
+
+
+4. modeling _multiple linear regression
+
+### modeling
+```{r}
+bee_model_0 <- lm(avg_max_col ~ all_fuel + count + all_fuel*count, data = bee_df)
+```
+
+### tidy(), glance()
+```{r}
+bee_model_0 %>%
+  tidy()
+
+bee_model_0 %>%
+  glance() %>%
+  select(1:3)
+```
+
+### add predictions and residuals
+```{r}
+bee_df <- bee_df %>%
+add_predictions(bee_model_0) %>%
+add_residuals(bee_model_0)
+```
+
+5. modeling _ graphing
+
+### Linearity: Observed vs Predicted Plot
+```{r}
+bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = avg_max_col))+
+geom_abline(slope = 1, intercept = 0, color = "blue")+
+labs(title = "Observed Predictions of factors",
+x= "Predictions", y = "Observed Price")
+```
+
+### Nearly normal residuals: QQ plot
+```{r}
+bee_df %>%
+ggplot()+
+geom_qq(aes(sample = resid))+
+geom_qq_line(aes(sample = resid),color = "red")+
+labs(title = "Q-Q Plot showing Residuals of Each Data",
+x = "Theoretical Quantiles", y = "Sample Quantiles")
+```
+
+### Constant variability: a residuals vs predicted plot
+```{r}
+bee_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = resid))+
+geom_hline(yintercept = 0)+
+labs(title = "Residual Versus Predicted of factors",
+x = "Predicted", y = "Residual")
+```
+
+
+
+
+
+
