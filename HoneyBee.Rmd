@@ -186,21 +186,24 @@ avg_max_col_summary <- new_bee_df %>%
     avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_sd = sd(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_min = min(avg_max_col_1000, na.rm = TRUE),
-    avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE))
+    avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE),
+    avg_max_col_median = median(avg_max_col_1000, na.rm = TRUE))
 
 all_fuel_summary <- new_bee_df %>%
   summarise(
     all_fuels_mean = mean(all_fuel, na.rm = TRUE),
     all_fuels_sd = sd(all_fuel, na.rm = TRUE),
     all_fuels_min = min(all_fuel, na.rm = TRUE),
-    all_fuels_max = max(all_fuel, na.rm = TRUE))
+    all_fuels_max = max(all_fuel, na.rm = TRUE),
+    all_fuels_median = median(all_fuel, na.rm = TRUE))
 
 tornado_summary <- new_bee_df %>%
   summarise(
     tornado_count_mean = mean(count, na.rm = TRUE),
     tornado_count_sd = sd(count, na.rm = TRUE),
     tornado_count_min = min(count, na.rm = TRUE),
-    tornado_count_max = max(count, na.rm = TRUE))
+    tornado_count_max = max(count, na.rm = TRUE),
+    tornado_count_median = median(count, na.rm = TRUE))
 ```
 
 ```{r}
