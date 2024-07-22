@@ -1,169 +1,201 @@
 ---
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
-#Set up
+# Set up
 ```{r setup, include = FALSE}
 
 # Load required packages
 library(dplyr)
+library(broom)
+library(modelr)
 
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(infer))
 ```
 
-#[Intro & DataSet]
-
+# 1. Intro & DataSet
 ```{r}
+# Read three csv files
 emissions <- read.csv("emissions.csv")
 save_the_bees <- read.csv("save_the_bees.csv")
 us_tornado_1950_2021 <-
   read.csv("us_tornado_dataset_1950_2021.csv")
 ```
 
-### filter 2015-2021
 ```{r}
+# Filter year 2015-2021 to use same period
 emission_21 <-filter(emissions, year >= 2015 & year <= 2021)
 bee_21 <- filter(save_the_bees, year >= 2015 & year <= 2021)
 tornado_21 <- filter(us_tornado_1950_2021, yr >= 2015 & yr <= 2021)
 
 ```
 
-## Honey Bee
-### select useful data
+### Honey Bee data
 ```{r}
-bee_21 <- bee_21 %>%
-  select( state, state_code, quarter, year, max_colonies
-  )
+# Select useful data to calculate average max_colonies with quarter
+bee_avg_max <- bee_21 %>%
+  select( state, state_code, quarter, year, max_colonies)
 ```
 
-### pivot wider into q1~q4
 ```{r}
-bee_21 <- bee_21 %>%
+# Pivot wider into q1~q4 
+bee_avg_max <- bee_avg_max %>%
   pivot_wider(
     names_from = quarter,
     values_from = max_colonies
   )
-```
 
-```{r}
-bee_21 <- bee_21 %>%
+bee_avg_max <- bee_avg_max %>%
   rename(q1 = '1', q2 = '2', q3 = '3', q4 = '4')
 ```
 
-### mutate average max colonies
 ```{r}
-bee_21 <- bee_21 %>%
+# Mutate average max colonies
+bee_avg_max <- bee_avg_max %>%
   mutate(
     avg_max_col = if_else(
       year != "2019",
       (q1 + q2 + q3 + q4) / 4, (q1 + q3 + q4) / 3) )
 ```
 
-### select state
-https://www.statista.com/statistics/191996/top-10-honey-producing-us-states/
-
-Top 10 honey producing U.S. states in 2022
-: North Dakota, California, Texas, Montana, Florida, South Dakota, Minnesota, Oregon, Michigan, Georgia
-
+### CO2 emission
 ```{r}
-bee_top_10 <- bee_21 %>%
-  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida", 
-                      "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
-```
-
-```{r}
-bee_top_10 <- bee_top_10 %>%
-  select(year, state, avg_max_col)
-```
-
-
-## CO2 emission
-### sum of each fuel.name value
-```{r}
-emission_21 <- emission_21 %>%
+# Sum of each fuel.name values
+emission_fuel <- emission_21 %>%
   group_by(year,state.name, fuel.name) %>%
   summarise(sum_value = sum(value, na.rm = TRUE),.groups = 'drop')
 
-emission_21 <- emission_21 %>%
-  rename(state = state.name)
 ```
-### pivot wide each fuel name
+
 ```{r}
-emission_21 <- emission_21 %>%
+# Pivot wide each fuel name
+emission_fuel <- emission_fuel %>%
   pivot_wider(
     names_from = fuel.name,
     values_from = sum_value
-  )
+  )%>%
+  rename(state = state.name, all_fuel = 'All Fuels')
 ```
 
-### filter Top 10 honey producers
+### Tornado
 ```{r}
-emission_10 <- emission_21 %>%
-  filter(state %in% c("North Dakota", "California", "Texas","Montana", "Florida",
-                           "South Dakota", "Minnesota", "Oregon", "Michigan", "Georgia" ))
-```
-
-```{r}
-emission_10 <- emission_10 %>%
-  rename(all_fules = `All Fuels`) %>%
-  select(year, state, all_fules)
-```
-
-## Tornado
-### Frequency
-```{r}
-tornado_21 <- tornado_21 %>%
-  group_by(yr, st) %>%
-  summarise(
-    count= n(), .groups = 'drop'
-  ) %>%
-  rename(year = yr, state = st)
+# Count tornado frequency by year and state
+tornado_freq <- tornado_21 %>%
+  rename(year = yr, state = st) %>%
+  group_by(year, state) %>%
+  summarise(count = n(), .groups = 'drop') 
 ```
 
 ```{r}
-tornado_10 <- tornado_21 %>%
-  filter(state %in% c("ND", "CA", "TX", "MT", "FL", "SD", "MN", "OR", "MI", "GA")) %>%
-  mutate(state = recode(state, 
-                     "ND" = "North Dakota", "CA" = "California",
-                     "TX" = "Texas", "MT" = "Montana",
-                     "FL" = "Florida","SD" = "South Dakota",
-                     "MN" = "Minnesota","OR" = "Oregon",
-                     "MI" = "Michigan","GA" = "Georgia"))
+# Fill 0 at no tornado state&year 
+# Make same column number with emission_21
+tornado_freq <- tornado_freq %>%
+  complete(year = unique(tornado_freq$year),
+           state = unique(tornado_freq$state),
+           fill = list(count = 0)) ### fill 0
 ```
 
-## merge
+### Merge Data for Modeling
+
+## 4. Modeling 1: Make first dataframe and model
+
+i. Step 1: bee vs emission
 ```{r}
-bee_df <- merge(bee_top_10, emission_10, c("year", "state"))
-bee_df <- merge(bee_df, tornado_10, c("year", "state"))  
+# Data cleaning
+bee_state <- bee_avg_max %>%
+  filter(!(state %in% c("Other", "United States")))
+emission_state <- emission_fuel %>%
+  filter(!(state %in% c("Alaska","Delaware","District of Columbia",
+                        "Nevada","New Hampshire","Rhode Island",
+                        "United States")))
 ```
 
-## EDA / Summary Statistics
+```{r}
+# Data merge
+bee_emission_df <- merge(bee_state, emission_state, by = c("state", "year")) %>%
+  mutate(
+    avg_max_col = round(avg_max_col, 0),
+    all_fuel = round(all_fuel, 0)
+    )
+```
 
+
+ii. Step 2: bee vs tornado
+```{r}
+# Data cleaning
+tornado_state <- tornado_freq %>%
+  filter(!(state %in% c("DC", "DE","NH","NV","PR","RI","VI"))
+         ) %>%
+  rename(state_code = state)
+```
+
+```{r}
+# Data merge
+bee_tornado_df <- merge(bee_state, tornado_state, by = c("state_code", "year"))
+```
+
+
+iii. Step 3: bee vs emission + tornado
+```{r}
+# Data cleaning
+bee_tornado_df <- bee_tornado_df %>%
+  select(year, state, count)
+bee_emission_df <- bee_emission_df %>%
+  select(year, state, avg_max_col, all_fuel)
+```
+
+```{r}
+# Data merge
+bee_df <- merge(bee_emission_df, bee_tornado_df, by = c("state", "year"))
+```
+
+------------------------------------------------------------------------------
+
+## 2. EDA / Summary Statistics
+
+i. Data frame
+```{r}
+bee_df %>%
+  ggplot() +
+  geom_point(mapping = aes(x = year, y = avg_max_col)) +
+  facet_wrap(~state, scales = "free_y")+
+  geom_smooth(aes(year, avg_max_col),method = "lm")
+```
+
+```{r}
+new_bee_df <- bee_df %>%
+  filter(state %in% c("Arizona", "Arkansas", "Colorado", "Louisiana", 
+                      "Maryland", "Minnesota", "Mississippi",
+                      "Missouri", "Montana", "Nebraska", "New Mexico",
+                      "Ohio", "South Dakota", "Washington"))
+```
+
+ii. Summary statistics
 ```{r}
 #Dividing avg_max_col by 1000
-bee_df <- bee_df %>%
+new_bee_df <- new_bee_df %>%
   mutate(avg_max_col_1000 = avg_max_col/1000)
 ```
 
 ```{r}
 # Detailed summary statistics for the entire dataset
-avg_max_col_summary <- bee_df %>%
+avg_max_col_summary <- new_bee_df %>%
   summarise(
     avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_sd = sd(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_min = min(avg_max_col_1000, na.rm = TRUE),
     avg_max_col_max = max(avg_max_col_1000, na.rm = TRUE))
 
-all_fules_summary <- bee_df %>%
+all_fuel_summary <- new_bee_df %>%
   summarise(
-    all_fuels_mean = mean(all_fules, na.rm = TRUE),
-    all_fuels_sd = sd(all_fules, na.rm = TRUE),
-    all_fuels_min = min(all_fules, na.rm = TRUE),
-    all_fuels_max = max(all_fules, na.rm = TRUE))
+    all_fuels_mean = mean(all_fuel, na.rm = TRUE),
+    all_fuels_sd = sd(all_fuel, na.rm = TRUE),
+    all_fuels_min = min(all_fuel, na.rm = TRUE),
+    all_fuels_max = max(all_fuel, na.rm = TRUE))
 
-tornado_summary <- bee_df %>%
+tornado_summary <- new_bee_df %>%
   summarise(
     tornado_count_mean = mean(count, na.rm = TRUE),
     tornado_count_sd = sd(count, na.rm = TRUE),
@@ -176,21 +208,26 @@ print(avg_max_col_summary)
 ```
 
 ```{r}
-print(all_fules_summary)
+print(all_fuel_summary)
 ```
 
 ```{r}
 print(tornado_summary)
 ```
 
+----------------------------------------------------------------------------
+
+iii. Visualization
+
+  * Bar graph
 ```{r}
-# Visualization of mean average maximum colonies by state and year
-bee_df %>%
+# Visualization of mean average maximum colonies by state and year, 
+#reordered by mean value
+new_bee_df %>%
   group_by(year, state) %>%
   summarise(
     avg_max_col_mean = mean(avg_max_col_1000, na.rm = TRUE),
-    .groups = 'drop'
-  ) %>%
+    .groups = 'drop') %>%
   ggplot() +
   geom_bar(mapping = aes(x = state, y = avg_max_col_mean, fill = year), 
            stat = "identity", position = "dodge") +
@@ -201,103 +238,127 @@ bee_df %>%
   ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-## EDA / Visualization
-
 ```{r}
-#Histogram of average bees
-bee_df %>%
+# Visualization of mean Carbon emissions by state and year, reordered by 
+#mean value
+new_bee_df %>%
+  group_by(year, state) %>%
+  summarise(
+    all_fuels_mean = mean(all_fuel, na.rm = TRUE),
+    .groups = 'drop') %>%
   ggplot() +
-  geom_histogram(mapping = aes(x = avg_max_col_1000,fill = state), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Average Maximum Colonies",
-       x = "Average Maximum Colonies (1 = 1000)",
-       y = "Frequency")
-```
-
-```{r}
-#Histogram of Carbon Emission
-bee_df %>%
-  ggplot() +
-  geom_histogram(mapping = aes(x = all_fules,fill = state), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Carbon Emissions",
-       x = "Carbon Emission",
-       y = "Frequency")
+  geom_bar(mapping = aes(x = reorder(state, all_fuels_mean, FUN = median), 
+                         y = all_fuels_mean, fill = year),
+           stat = "identity", position = "dodge") +
+  labs(
+    title = "Carbon Emission by State and Year",
+    x = "State",
+    y = "Carbon emissions"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ```{r}
-#Histogram of Tornado
-bee_df %>%
+# Visualization of mean Tornado count by state and year, reordered by 
+#mean value
+new_bee_df %>%
+  group_by(year, state) %>%
+  summarise(
+    tornado_count_mean = mean(count, na.rm = TRUE),
+    .groups = 'drop') %>%
   ggplot() +
-  geom_histogram(mapping = aes(x = count, fill = state), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Tornado",
-       x = "Carbon Emission",
-       y = "Frequency")
-```
-```{r,}
-#Boxplot of average colonies
-bee_df %>%
-  ggplot() +
-  geom_boxplot(mapping = aes(x = avg_max_col_1000), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Average Maximum Colonies",
-       x = "Average Maximum Colonies (1 = 1000)",
-       y = "Frequency")
-```
-
-```{r,}
-#Boxplot of Emission
-bee_df %>%
-  ggplot() +
-  geom_boxplot(mapping = aes(x = all_fules), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Tornado",
-       x = "Carbon Emission",
-       y = "Frequency")
+  geom_bar(mapping = aes(x = reorder(state, tornado_count_mean, FUN = median), 
+                         y = tornado_count_mean, fill = year),
+           stat = "identity", position = "dodge") +
+  labs(
+    title = "Tornado Count by State and Year",
+    x = "State",
+    y = "Tornado Count"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-
-```{r,}
-#Boxplot of Tornado
-bee_df %>%
-  ggplot() +
-  geom_boxplot(mapping = aes(x = count), bins = 20) +
-  facet_wrap(~year) +
-  labs(title = "Distribution of Tornado",
-       x = "Count of tornado",
-       y = "Frequency")
-```
+  * box plot
 
 ```{r}
-#Violin plot for Colonies and Year
-bee_df %>%
+# Boxplot of average maximum colonies
+new_bee_df %>%
   ggplot() +
-  geom_violin(mapping = aes(x = year,y = avg_max_col_1000)) +
+  geom_boxplot(mapping = aes(x = factor(year), y = avg_max_col_1000)) +
   labs(
     title = "Distribution of Average Maximum Colonies by Year",
     x = "Year",
+    y = "Average Maximum Colonies (1 = 1000)"
+  )
+```
+
+```{r}
+# Boxplot of Carbon Emissions
+new_bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = factor(year), y = all_fuel)) +
+  labs(
+    title = "Distribution of Carbon emission by Year",
+    x = "Year",
+    y = "Amount of Carbon Emission"
+  )
+```
+
+```{r}
+# Boxplot of Tornado count
+new_bee_df %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = factor(year), y = count)) +
+  labs(
+    title = "Distribution of Tornado Count by Year",
+    x = "Year",
+    y = "Tornado Count"
+  )
+```
+
+```{r}
+#Scatter plot for Colonies and Emission
+new_bee_df %>%
+  ggplot() +
+  geom_point(mapping = aes(x = all_fuel,y = avg_max_col_1000)) +
+  geom_smooth(aes(all_fuel,avg_max_col_1000),method = "lm")+
+  facet_wrap(~year, scales = "free")+
+  labs(
+    title = "Distribution of Average Maximum Colonies and Emission by Year",
+    x = "All fuels",
     y = "Maximum Colonies (1 = 1000)"
     )
 ```
 
+  * Violin plot
+
+```{r}
+# Violin plot of average maximum colonies
+new_bee_df %>%
+  ggplot() +
+  geom_violin(mapping = aes(x = factor(year), y = avg_max_col_1000)) +
+  labs(
+    title = "Distribution of Average Maximum Colonies by Year",
+    x = "Year",
+    y = "Average Maximum Colonies (1 = 1000)"
+  )
+```
 ```{r}
 #Violin plot for Emission by year
-bee_df %>%
+new_bee_df %>%
   ggplot() +
-  geom_violin(mapping = aes(x = year,y = all_fules)) +
+  geom_violin(mapping = aes(x = factor(year), y = all_fuel)) +
   labs(
     title = "Distribution of Carbon Emissions by Year",
     x = "Year",
     y = "Amount of Emissions"
     )
 ```
-
 ```{r}
 #Violin plot for Tornado count
-bee_df %>%
+new_bee_df %>%
   ggplot() +
-  geom_violin(mapping = aes(x = year,y = count)) +
+  geom_violin(mapping = aes(x = factor(year),y = count)) +
   labs(
     title = "Distribution of Tornado Count by Year",
     x = "Year",
@@ -305,16 +366,228 @@ bee_df %>%
     )
 ```
 
-##Hypothesis testing Idea
-
-
-##Modeling (lm)
 
 
 
+## 3. Hypothesis testing Idea
 
-bees using data max number.
-single interaction multiple lm(y ~ x1 + x2 + x1*x2)
+* Null Hypothesis (H0): There is no significant correlation between carbon emissions and tornado occurrences with the decline in bee populations.
 
-  
+* Alternative Hypothesis (H1): There is a significant correlation between carbon emissions and tornado occurrences with the decline in bee populations.
 
+##dataset 
+```{r}
+median_fuel <- median(bee_df$all_fuel)
+median_count <- median(bee_df$count)
+
+bee_df <- bee_df %>%
+  mutate(fuel_group = ifelse(all_fuel > median_fuel, "High Fuel", "Low Fuel"),
+         count_group = ifelse(count > median_count, "High Count", "Low Count"))
+```
+
+## Model_1: Test correlation between all_fuel and avg_max_col
+```{r}
+set.seed(50)
+
+model_1_null <- bee_df %>%
+  specify(response = avg_max_col, explanatory = fuel_group) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 10000, type = "permute") %>%
+  calculate(stat = "diff in medians")
+
+model_1_obs_stat <- bee_df %>%
+  specify(response = avg_max_col, explanatory = fuel_group) %>%
+  calculate(stat = "diff in medians")
+
+p_value_model_1 <- model_1_null %>%
+  get_p_value(obs_stat = model_1_obs_stat, direction = "greater")
+
+print(p_value_model_1)
+
+model_1_null %>%
+  visualize(obs_stat = model_1_obs_stat, direction = "greater") +
+  shade_p_value(obs_stat = model_1_obs_stat, direction = "greater") +
+  labs(title = "Null Distribution for Model 1 (Fuel Group vs avg_max_col)",
+       x = "Difference in Medians",
+       y = "Density") +
+  theme_minimal()
+```
+
+##model_2:Test correlation between count and avg_max_col
+```{r}
+set.seed(50)
+
+model_2_null <- bee_df %>%
+  specify(response = avg_max_col, explanatory = count_group) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 10000, type = "permute") %>%
+  calculate(stat = "diff in medians")
+
+model_2_obs_stat <- bee_df %>%
+  specify(response = avg_max_col, explanatory = count_group) %>%
+  calculate(stat = "diff in medians")
+
+p_value_model_2 <- model_2_null %>%
+  get_p_value(obs_stat = model_2_obs_stat, direction = "greater")
+
+print(p_value_model_2)
+
+model_2_null %>%
+  visualize(obs_stat = model_2_obs_stat, direction = "greater") +
+  shade_p_value(obs_stat = model_2_obs_stat, direction = "greater") +
+  labs(title = "Null Distribution for Model 2 (Count Group vs avg_max_col)",
+       x = "Difference in Medians",
+       y = "Density") +
+  theme_minimal()
+```
+
+
+# Interpretation of results
+
+```{r}
+p_value_model_1 <- 0.8822
+p_value_model_2 <- 0.4249
+alpha <- 0.05
+
+conclusion_model_1 <- if (p_value_model_1 < alpha) {
+  "There is a significant correlation between carbon emissions and the decline in bee populations."
+} else {
+  "There is no significant correlation between carbon emissions and the decline in bee populations."
+}
+
+conclusion_model_2 <- if (p_value_model_2 < alpha) {
+  "There is a significant correlation between tornado occurrences and the decline in bee populations."
+} else {
+  "There is no significant correlation between tornado occurrences and the decline in bee populations."
+}
+
+print(paste("Model 1 Conclusion:", conclusion_model_1))
+print(paste("Model 2 Conclusion:", conclusion_model_2))
+
+```
+
+
+------------------------------------------------------------------------------
+
+
+#4. Modeling
+
+## Model 1 -> Emission and average max colonies of decreasing state
+```{r}
+# modeling 1
+bee_model_em <- lm(avg_max_col ~ all_fuel, data = new_bee_df)
+```
+```{r}
+bee_model_em %>%
+  tidy()
+
+bee_model_em %>%
+  glance() %>%
+  select(1:3)
+```
+```{r}
+# add predictions and residuals
+bee_update_df <- new_bee_df %>%
+  add_predictions(bee_model_em) %>%
+  add_residuals(bee_model_em)
+```
+
+```{r}
+# graph 1 Linearity condition
+bee_update_df %>%
+  ggplot()+
+  geom_point(mapping = aes(y = avg_max_col, x = all_fuel))+
+  geom_abline(slope = bee_model_em$coefficients[2],
+              intercept = bee_model_em$coefficients[1])+
+  labs(title = "Linearity condition", x = "All fules", 
+       y = "Average max colonies")
+
+```
+
+```{r}
+bee_update_df %>%
+  ggplot()+
+  geom_histogram(mapping = aes(x = resid),binwidth = 15000)+
+  labs(title = "Residual Count of model ", x = "Residuals" , y= "Count")
+``` 
+
+## Model 2 -> Tornado and max colonies
+```{r}
+# modeling 2
+bee_model_tor <- lm(avg_max_col ~ count, data = new_bee_df)
+```
+```{r}
+bee_model_tor %>%
+  tidy()
+
+bee_model_tor %>%
+  glance() %>%
+  select(1:3)
+```
+```{r}
+# add predictions and residuals
+bee_update_df_2 <- new_bee_df %>%
+  add_predictions(bee_model_tor) %>%
+  add_residuals(bee_model_tor)
+```
+```{r}
+# graph 1 Linearity condition
+bee_update_df_2 %>%
+  ggplot()+
+  geom_point(mapping = aes(y = avg_max_col, x = count))+
+  geom_abline(slope = bee_model_tor$coefficients[2],
+              intercept = bee_model_tor$coefficients[1])+
+  labs(title = "Linearity condition with Tornado Count", x = "Tornado Frequency", 
+       y = "Average max colonies")
+
+```
+
+```{r}
+bee_update_df_2 %>%
+  ggplot()+
+  geom_histogram(mapping = aes(x = resid), ,binwidth = 15000)+
+  labs(title = "Residual Count of model 2", x = "Residuals" , y= "Count")
+```
+
+## Model 3: Multiple Linear Regression Model
+```{r}
+# Modeling
+bee_model <- lm(avg_max_col ~ all_fuel + count + all_fuel*count, data = bee_df)
+```
+
+```{r}
+# Make new dataframe
+bee_mul_df <- bee_df %>%
+add_predictions(bee_model) %>%
+add_residuals(bee_model)
+```
+
+```{r}
+# Linearity: with new df
+bee_mul_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = avg_max_col))+
+geom_abline(slope = 1, intercept = 0, color = "blue")+
+labs(title = "Observed Predictions of factors",
+x= "Predictions", y = "Observed Price")
+```
+
+```{r}
+# Nearly normal residuals: with new df
+bee_mul_df %>%
+ggplot()+
+geom_qq(aes(sample = resid))+
+geom_qq_line(aes(sample = resid),color = "red")+
+labs(title = "Q-Q Plot showing Residuals of Each Data",
+x = "Theoretical Quantiles", y = "Sample Quantiles")
+```
+
+```{r}
+# Constant variability: with new df
+bee_mul_df %>%
+ggplot()+
+geom_point(mapping = aes(x = pred, y = resid))+
+geom_hline(yintercept = 0)+
+labs(title = "Residual Versus Predicted of factors",
+x = "Predicted", y = "Residual")
+```
