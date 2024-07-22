@@ -244,11 +244,11 @@ new_bee_df %>%
 new_bee_df %>%
   group_by(year, state) %>%
   summarise(
-    all_fules_mean = mean(all_fules, na.rm = TRUE),
+    all_fuels_mean = mean(all_fuel, na.rm = TRUE),
     .groups = 'drop') %>%
   ggplot() +
-  geom_bar(mapping = aes(x = reorder(state, all_fules_mean, FUN = median), 
-                         y = all_fules_mean, fill = year),
+  geom_bar(mapping = aes(x = reorder(state, all_fuels_mean, FUN = median), 
+                         y = all_fuels_mean, fill = year),
            stat = "identity", position = "dodge") +
   labs(
     title = "Carbon Emission by State and Year",
@@ -296,7 +296,7 @@ new_bee_df %>%
 # Boxplot of Carbon Emissions
 new_bee_df %>%
   ggplot() +
-  geom_boxplot(mapping = aes(x = factor(year), y = all_fules)) +
+  geom_boxplot(mapping = aes(x = factor(year), y = all_fuel)) +
   labs(
     title = "Distribution of Carbon emission by Year",
     x = "Year",
