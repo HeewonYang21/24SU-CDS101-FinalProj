@@ -238,7 +238,9 @@ new_bee_df %>%
     title = "Average Maximum Colonies by State and Year",
     x = "State",
     y = "Average Maximum Colonies (1 = 1000)"
-  ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ) 
++ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  facet_wrap(~year)
 ```
 
 ```{r}
@@ -257,8 +259,9 @@ new_bee_df %>%
     title = "Carbon Emission by State and Year",
     x = "State",
     y = "Carbon emissions"
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  )
++ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  facet_wrap(~year)
 ```
 
 ```{r}
@@ -277,8 +280,9 @@ new_bee_df %>%
     title = "Tornado Count by State and Year",
     x = "State",
     y = "Tornado Count"
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ) 
++ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  facet_wrap(~year)
 ```
 
   * box plot
